@@ -1,3 +1,4 @@
+var settings = require("./settings");
 var API = require('./api-functions'),
 	RATE_LIMIT_EXCEEDED_TIMEOUT = 1000 * 60 * 10, 	// 10 minutes
 	RETWEET_TIMEOUT = 1000 * 5; 					// 5 seconds
@@ -12,22 +13,22 @@ var API = require('./api-functions'),
 	/** The Callback function for the Search API */
 	var searchCallback = function (response) {
 		var payload = JSON.parse(response);
-		
+
+
 		// Iterating through tweets returned by the Search
 		payload.statuses.forEach(function (searchItem) {
-
-			// Further filtering out the retweets and tweets from blocked users
+			// Further filtering out the retweets and tweets from blocked users as well as tweets without photo
 			if (!searchItem.retweeted_status && blockedUsers.indexOf(searchItem.user.id) === -1) {
-
 				// Save the search item in the Search Results array
 				searchResultsArr.push(searchItem);
 			}
 		});
+							//&& searchItem.entities.media
 
-		// If we have the next_results, search again for the rest (sort of a pagination)
-		if (payload.search_metadata.next_results) {
-			API.searchByStringParam(payload.search_metadata.next_results, searchCallback);
-		}
+			// If we have the next_results, search again for the rest (sort of a pagination)
+			if (payload.search_metadata.next_results) {
+				API.searchByStringParam(payload.search_metadata.next_results, searchCallback);
+			}
   	};
 
   	/** The error callback for the Search API */
@@ -46,9 +47,8 @@ var API = require('./api-functions'),
   	/** The Search function */
   	var search = function () {
   		API.search({
-  			// Without having the word "vote", and filtering out retweets - as much as possible
-			text: "retweet to win -vote -filter:retweets OR RT to win -vote -filter:retweets", 
-			result_type: "recent",
+			text: settings.textFilter,
+			result_type: settings.resultType,
 			callback: searchCallback,
 			error_callback: errorHandler,
 			since_id: last_tweet_id
@@ -64,20 +64,21 @@ var API = require('./api-functions'),
   			if (searchResultsArr.length) {
 
   				// Pop the first element (by doing a shift() operation)
-  				var searchItem = searchResultsArr[0];	
+  				var searchItem = searchResultsArr[0];
   				searchResultsArr.shift();
-  				
+					console.log(searchItem.retweeted);
   				// Retweet
-                console.log("Retweeting", searchItem.id);
+								console.log("Retweeting", searchItem.id);
+
 				API.retweet(
-                    searchItem.id_str, 
+                    searchItem.id_str,
                     function success() {
 
                         // On success, try to Favorite and Follow
-                        if (searchItem.text.toLowerCase().indexOf("fav") > -1) {
+                        if (searchItem.text.toLowerCase().indexOf("like") > -1) {
                             //API.favorite(searchItem.id_str);
                             console.log("Favorite", searchItem.id);
-                        } 
+                        }
                         if (searchItem.text.toLowerCase().indexOf("follow") > -1) {
                             //API.follow(searchItem.user.id_str);
                             console.log("Follow", searchItem.user.screen_name);
@@ -99,9 +100,9 @@ var API = require('./api-functions'),
                         }, RATE_LIMIT_EXCEEDED_TIMEOUT);
                     }
                 );
-  			}	
+  			}
 
-  			
+
   		}, RETWEET_TIMEOUT);
   	}
 
